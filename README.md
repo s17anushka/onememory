@@ -1,70 +1,125 @@
-# OneMemory — a shared, cross-tool memory layer for AI agents
+# 🧠 OneMemory
 
-**Built for the CockroachDB × AWS Hackathon.**
+### A shared, cross-tool memory layer for AI agents — backed by CockroachDB.
 
-Every AI coding tool today (Claude Code, Cursor, custom bots) has amnesia the
-moment you switch tools. Tell Claude Code a preference, open Cursor an hour
-later, and you're explaining it all over again. **OneMemory** fixes this by
-giving every MCP-compatible agent a single, persistent, semantically
-searchable memory — backed by CockroachDB.
+> Built for the **CockroachDB × AWS Hackathon**
 
-Store a fact in one tool. Recall it, automatically, from any other.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CockroachDB](https://img.shields.io/badge/CockroachDB-Serverless-6933FF)](https://cockroachlabs.cloud)
+[![AWS](https://img.shields.io/badge/AWS-S3-FF9900)](https://aws.amazon.com/s3/)
+[![MCP](https://img.shields.io/badge/MCP-compatible-black)](https://modelcontextprotocol.io)
 
-## How it works
+**Live demo:** `<paste your S3 static website URL here>`
+`
+
+---
+
+## The problem
+
+Every AI coding tool today has amnesia the moment you switch context. Tell
+Claude Code a preference or a project decision, then open Cursor an hour
+later — and you're explaining it all over again. Memory today is trapped
+**per tool**, not owned by the person using the tools.
+
+## The idea
+
+**OneMemory** gives every MCP-compatible agent a single, persistent,
+semantically searchable memory layer. Store a fact once, from any tool.
+Recall it later, automatically, from any *other* tool — because the memory
+doesn't live in the tool. It lives in CockroachDB.
 
 ```
 Claude Code ──┐
 Cursor       ──┼──►  OneMemory MCP Server  ──►  CockroachDB
-Any MCP tool ──┘        (local embeddings)       (vector index)
+Any MCP tool ──┘        (local embeddings)      (persistent memory +
+                                                  distributed vector index)
 
-                 AWS Lambda (Function URL)
-                        │
-                        ▼
-              Same memory layer, over HTTP
-              (for web dashboards / other clients)
+                                    │
+                                    ▼
+                    export-memories.mjs (Node script)
+                                    │
+                                    ▼
+                     Amazon S3 (static website hosting)
+                     — a public, live dashboard of every
+                       memory the agent has ever learned
 ```
 
-- **Storage & recall logic** lives in a small MCP server. Any MCP-compatible
-  agent can call two tools: `remember` and `recall`.
-- **Embeddings are generated locally** (`Xenova/all-MiniLM-L6-v2`, running
-  in-process via `@xenova/transformers`) — no paid embedding API, so the
-  whole project runs on free tiers.
-- **CockroachDB** is the single source of truth: one `memories` table with a
-  native **Distributed Vector Index** for semantic search, so recall stays
-  fast as memory grows, with no separate vector store to keep in sync.
-- **AWS Lambda** exposes the same logic over a Function URL (free tier — no
-  API Gateway charge), so the memory layer isn't locked to one machine or
-  one tool's process.
+## How it works
+
+1. **Store** — Claude Code (or any MCP client) calls the `remember` tool.
+   The MCP server embeds the text locally and writes it to CockroachDB.
+2. **Recall** — A different tool, a different session, calls `recall`. The
+   MCP server runs a semantic similarity search over CockroachDB's
+   **Distributed Vector Index** and returns the most relevant memories —
+   regardless of which tool originally stored them.
+3. **Prove it** — An export script pulls the full memory table out of
+   CockroachDB and publishes it as a live, human-readable dashboard hosted
+   on **Amazon S3**, so anyone can see the memory layer working without
+   needing terminal access.
+
+## Why this matters
+
+Agent memory today is a feature bolted onto one app. OneMemory treats
+memory as **infrastructure** — durable, portable, and queryable by any
+agent that speaks MCP. That's exactly the role CockroachDB is built to
+play: a system of record that's always on, globally consistent, and
+natively wired into the agent toolchain.
+
+---
 
 ## CockroachDB tools used
 
-1. **CockroachDB Cloud Managed MCP Server / MCP integration** — the whole
-   project *is* an MCP server backed by CockroachDB; Claude Code and Cursor
-   connect to it directly via `mcp.json` config.
-2. **Distributed Vector Indexing** — the `memories` table has a
-   `VECTOR(384)` column with a `vector_cosine_ops` index (see
-   `schema/schema.sql`), used for semantic recall in both the MCP server and
-   the Lambda handler.
+| Tool | How it's used |
+|---|---|
+| **MCP Server** | The entire project *is* an MCP server backed by CockroachDB — Claude Code and Cursor connect to it directly as a persistent memory tool. |
+| **Distributed Vector Indexing** | The `memories` table has a `VECTOR(384)` column with a `vector_cosine_ops` index (`schema/schema.sql`), used for semantic recall in `db.ts`. |
 
 ## AWS services used
 
-- **AWS Lambda** — hosts an HTTP-accessible copy of the memory layer via a
-  Function URL, entirely within the AWS free tier (1M requests +
-  400,000 GB-seconds/month, no charge).
+| Service | How it's used |
+|---|---|
+| **Amazon S3** | Hosts a live, public static-website dashboard (`index.html` + `memories.json`) that mirrors what's stored in CockroachDB — a transparent, always-current view into the agent's memory, with zero server to maintain. |
+
+---
+
+## Project structure
+
+```
+onememory/
+├── schema/
+│   └── schema.sql          # CockroachDB table + distributed vector index
+├── mcp-server/
+│   ├── src/
+│   │   ├── index.ts        # MCP server: remember + recall tools
+│   │   ├── db.ts           # CockroachDB read/write logic
+│   │   └── embeddings.ts   # local, free embedding generation
+│   ├── test-client.mjs     # standalone test client (no LLM required)
+│   ├── export-memories.mjs # exports CockroachDB → memories.json
+│   ├── index.html          # static dashboard, deployed to S3
+│   └── setup-s3.ps1        # one-shot S3 bucket + hosting automation
+├── docs/
+│   └── mcp-config-example.json
+├── README.md
+└── LICENSE
+```
+
+---
 
 ## Setup
 
 ### 1. CockroachDB (free Serverless cluster)
 
-1. Create a free CockroachDB Serverless cluster at
-   [cockroachlabs.cloud](https://cockroachlabs.cloud).
+1. Create a free cluster at [cockroachlabs.cloud](https://cockroachlabs.cloud).
 2. Copy the connection string.
-3. Run the schema:
-   ```bash
-   cockroach sql --url "$COCKROACH_DATABASE_URL" -f schema/schema.sql
+3. Run the schema (via the CockroachDB SQL Shell or `cockroach sql`):
+   ```sql
+   -- see schema/schema.sql for the full script
+   CREATE TABLE IF NOT EXISTS memories (...);
+   CREATE VECTOR INDEX IF NOT EXISTS memories_embedding_idx
+       ON memories (embedding vector_cosine_ops);
    ```
 
-### 2. MCP server (for Claude Code / Cursor)
+### 2. MCP server (Claude Code / Cursor)
 
 ```bash
 cd mcp-server
@@ -72,79 +127,50 @@ npm install
 npm run build
 ```
 
-Add to your MCP client config (e.g. Claude Code's `mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "onememory": {
-      "command": "node",
-      "args": ["/absolute/path/to/onememory/mcp-server/dist/index.js"],
-      "env": {
-        "COCKROACH_DATABASE_URL": "postgresql://...",
-        "ONEMEMORY_SOURCE_TOOL": "claude-code"
-      }
-    }
-  }
-}
-```
-
-Repeat for Cursor with `"ONEMEMORY_SOURCE_TOOL": "cursor"` — same
-`COCKROACH_DATABASE_URL`, same memories, different tool.
-
-### 3. AWS Lambda (free tier)
+Register it with Claude Code:
 
 ```bash
-cd lambda
-npm install
-zip -r function.zip .
+claude mcp add onememory --transport stdio -- node "/absolute/path/to/mcp-server/dist/index.js"
 ```
 
-Then, in the AWS Console (or CLI):
+Then add `COCKROACH_DATABASE_URL` and `ONEMEMORY_SOURCE_TOOL` to the
+server's `env` block in your Claude Code config (see
+`docs/mcp-config-example.json`). Repeat for Cursor with a different
+`ONEMEMORY_SOURCE_TOOL` value — same database, same memories.
+
+### 3. Test without an LLM (free, instant)
 
 ```bash
-aws lambda create-function \
-  --function-name onememory \
-  --runtime nodejs20.x \
-  --handler index.handler \
-  --zip-file fileb://function.zip \
-  --role <your-lambda-execution-role-arn> \
-  --timeout 30 \
-  --memory-size 512 \
-  --environment "Variables={COCKROACH_DATABASE_URL=postgresql://...}"
-
-aws lambda create-function-url-config \
-  --function-name onememory \
-  --auth-type NONE
+node test-client.mjs
 ```
 
-Test it:
+This connects to the MCP server directly and calls `remember` /
+`recall`, proving the whole pipeline works without spending any API
+credits.
+
+### 4. Publish the live dashboard to S3
 
 ```bash
-curl -X POST https://<your-function-url>/remember \
-  -H "content-type: application/json" \
-  -d '{"content": "This project uses CockroachDB Serverless, free tier.", "sourceTool": "onememory-web", "project": "hackathon-demo"}'
-
-curl -X POST https://<your-function-url>/recall \
-  -H "content-type: application/json" \
-  -d '{"query": "what database are we using?", "project": "hackathon-demo"}'
+node export-memories.mjs   # CockroachDB -> memories.json
+./setup-s3.ps1             # creates bucket, enables hosting, uploads files
 ```
 
-## Demo script (for the submission video)
+---
 
-1. In Claude Code: state a project preference or decision. Show it get
-   stored (`remember` tool call).
-2. Open Cursor (same `COCKROACH_DATABASE_URL`, different
-   `ONEMEMORY_SOURCE_TOOL`): ask a related question. Show it recall the
-   fact from Claude Code automatically, with no re-explaining.
-3. Show the CockroachDB console: the `memories` table, the vector index,
-   and the row that was just inserted.
-4. Hit the Lambda Function URL directly with `curl` to show the same
-   memory is accessible over plain HTTP, independent of any single tool or
-   machine.
+## Demo script
 
-## Why this matters
+1. In Claude Code, state a project decision or preference — watch the
+   `remember` tool fire.
+2. Open Cursor (same database, different `ONEMEMORY_SOURCE_TOOL`) and ask
+   a related question — watch it `recall` the fact from Claude Code, with
+   no re-explaining.
+3. Re-run `export-memories.mjs` and refresh the S3-hosted dashboard —
+   the new memory appears live, publicly, with no server to manage.
+4. Show the CockroachDB console: the `memories` table and its vector
+   index, proving the data's source of truth.
 
-Agent memory today is trapped per-tool. OneMemory treats memory as
-infrastructure — durable, portable, and queryable by any agent that speaks
-MCP — which is exactly the role CockroachDB is built to play.
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
