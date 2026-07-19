@@ -156,19 +156,7 @@ node export-memories.mjs   # CockroachDB -> memories.json
 
 ---
 
-## Demo script
 
-1. In Claude Code, state a project decision or preference — watch the
-   `remember` tool fire.
-2. Open Cursor (same database, different `ONEMEMORY_SOURCE_TOOL`) and ask
-   a related question — watch it `recall` the fact from Claude Code, with
-   no re-explaining.
-3. Re-run `export-memories.mjs` and refresh the S3-hosted dashboard —
-   the new memory appears live, publicly, with no server to manage.
-4. Show the CockroachDB console: the `memories` table and its vector
-   index, proving the data's source of truth.
-
----
 
 ## License
 
