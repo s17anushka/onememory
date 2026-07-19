@@ -9,8 +9,7 @@
 [![AWS](https://img.shields.io/badge/AWS-S3-FF9900)](https://aws.amazon.com/s3/)
 [![MCP](https://img.shields.io/badge/MCP-compatible-black)](https://modelcontextprotocol.io)
 
-**Live demo:** `<paste your S3 static website URL here>`
-`
+**Live demo:** `http://onememory-hackathon-anushka7.s3-website.ap-south-1.amazonaws.com'
 
 ---
 
