@@ -1,0 +1,10 @@
+{
+  "name": "onememory-lambda",
+  "version": "1.0.0",
+  "description": "HTTP-accessible copy of the OneMemory layer, deployed on AWS Lambda (Function URL, free tier).",
+  "type": "module",
+  "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "pg": "^8.13.1"
+  }
+}

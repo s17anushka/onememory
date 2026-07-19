@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>OneMemory — Shared Cross-Tool Agent Memory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #0b0d12;
+    color: #e6e6e6;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  .subtitle { color: #9aa0a6; margin-bottom: 24px; }
+  .stat {
+    display: inline-block;
+    background: #161a22;
+    border: 1px solid #262b36;
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin-right: 10px;
+    font-size: 14px;
+    color: #9aa0a6;
+  }
+  .memory {
+    background: #161a22;
+    border: 1px solid #262b36;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .memory-content { font-size: 15px; line-height: 1.5; margin-bottom: 8px; }
+  .memory-meta {
+    font-size: 12px;
+    color: #7d8590;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    background: #1f2937;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+  #empty { color: #7d8590; padding: 20px 0; }
+  footer { margin-top: 40px; color: #555; font-size: 12px; }
+  a { color: #6ea8fe; }
+</style>
+</head>
+<body>
+  <h1>🧠 OneMemory</h1>
+  <div class="subtitle">A shared, cross-tool memory layer for AI agents — backed by CockroachDB.</div>
+  <div id="stats"></div>
+  <div id="memories" style="margin-top:24px;"></div>
+  <div id="empty" style="display:none;">No memories yet. Store one via the MCP server (Claude Code / Cursor) and re-export.</div>
+  <footer>Built for the CockroachDB × AWS Hackathon. Data hosted on Amazon S3, sourced from CockroachDB Serverless.</footer>
+
+<script>
+  fetch('memories.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('stats').innerHTML =
+        `<span class="stat">${data.count} memories</span>` +
+        `<span class="stat">last updated: ${new Date(data.generated_at).toLocaleString()}</span>`;
+
+      const container = document.getElementById('memories');
+      if (data.memories.length === 0) {
+        document.getElementById('empty').style.display = 'block';
+        return;
+      }
+      data.memories.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'memory';
+        div.innerHTML = `
+          <div class="memory-content">${m.content}</div>
+          <div class="memory-meta">
+            <span class="tag">${m.source_tool}</span>
+            ${m.project ? `<span class="tag">${m.project}</span>` : ''}
+            <span>${new Date(m.created_at).toLocaleString()}</span>
+            <span>recalled ${m.recall_count}×</span>
+          </div>`;
+        container.appendChild(div);
+      });
+    })
+    .catch(err => {
+      document.getElementById('empty').style.display = 'block';
+      document.getElementById('empty').innerText = 'Could not load memories.json: ' + err;
+    });
+</script>
+</body>
+</html>

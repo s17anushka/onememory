@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-07-19T17:04:39.853Z",
+  "count": 1,
+  "memories": [
+    {
+      "id": "19596ce9-0a3a-4862-8dbb-c82cc0cf23d3",
+      "source_tool": "test-script",
+      "project": "hackathon-demo",
+      "content": "This hackathon project uses CockroachDB Serverless on AWS Mumbai region as the persistent memory layer.",
+      "created_at": "2026-07-19T16:25:20.413Z",
+      "recall_count": "1"
+    }
+  ]
+}
